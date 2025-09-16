@@ -11,6 +11,7 @@ from context import Context
 from state import State
 from utils import load_chat_model, plot_graph
 from tools import get_tools
+from memories import set_memory
 
 
 async def call_model(
@@ -114,7 +115,7 @@ def build_graph(checkpointer: BaseCheckpointSaver):
 from langgraph.checkpoint.memory import InMemorySaver
 from typing import AsyncIterator, Any
 async def print_stream():
-    memory = InMemorySaver()
+    memory = set_memory(local_storage=False)
     config = {
         "configurable": {"thread_id": "1"}
     }
@@ -126,7 +127,7 @@ async def print_stream():
 
 if __name__ == "__main__":
     import asyncio
-    memory = InMemorySaver()
+    memory = set_memory(local_storage=False)
     config = {
         "configurable": {"thread_id": "1"}
     }
@@ -136,6 +137,8 @@ if __name__ == "__main__":
     while True:
         input_msg = {"messages": [HumanMessage(content=input("请输入问题: "))]}
         # plot_graph(graph, save_path="graph.png")
+        if input_msg["messages"][0].content in ["bye", "exit", "quit"]:
+            break
 
         response = asyncio.run(graph.ainvoke(input_msg, config=config, context=context))
         print(response.get("messages", [])[-1].content)
