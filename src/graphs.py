@@ -58,6 +58,7 @@ async def call_model(
     # Return the model's response as a list to be added to existing messages
     return {"messages": [response]}
 
+
 def route_model_output(state: State) -> Literal["__end__", "tools"]:
     """Determine the next node based on the model's output.
 
@@ -112,35 +113,32 @@ def build_graph(checkpointer: BaseCheckpointSaver):
     return graph
 
 
-from langgraph.checkpoint.memory import InMemorySaver
-from typing import AsyncIterator, Any
 async def print_stream():
-    memory = set_memory(local_storage=False)
-    config = {
-        "configurable": {"thread_id": "1"}
-    }
-    input_msg = {"messages": [HumanMessage(content="现在是具体什么时间")]}
+    checkpointer = set_memory(local_storage=False)
+    config = {"configurable": {"thread_id": "stream_test"}}
     context = Context()
-    graph: StateGraph = build_graph(checkpointer=memory)
-    aresponse: AsyncIterator[dict[str, Any] | Any] = graph.astream(input_msg, config=config, context=context, stream_mode="values")
-    pass
-
-if __name__ == "__main__":
-    import asyncio
-    memory = set_memory(local_storage=False)
-    config = {
-        "configurable": {"thread_id": "1"}
-    }
-    context = Context()
-    graph: StateGraph = build_graph(checkpointer=memory)
-    # input_msg = {"messages": [HumanMessage(content="现在是具体什么时间")]}
+    graph: StateGraph = build_graph(checkpointer=checkpointer)
     while True:
         input_msg = {"messages": [HumanMessage(content=input("请输入问题: "))]}
-        # plot_graph(graph, save_path="graph.png")
         if input_msg["messages"][0].content in ["bye", "exit", "quit"]:
             break
 
-        response = asyncio.run(graph.ainvoke(input_msg, config=config, context=context))
-        print(response.get("messages", [])[-1].content)
+        async for event in graph.astream(
+            input=input_msg,
+            config=config,
+            context=context,
+            stream_mode="values",
+            debug=False,
+        ):
+            if "messages" in event:
+                messages = event["messages"]
+                if messages:
+                    last_message = messages[-1]
+                    if isinstance(last_message, AIMessage) and last_message.content:
+                        print(last_message.content, end="", flush=True)
 
-    
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(print_stream())
